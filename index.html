@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>درع الغابة — تسجيل الدخول</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0a">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#0d2a0d,#1a3a1a);color:#fff;padding:15px}
+.box{background:#111;padding:30px;border-radius:14px;border:1px solid #2e7d32;width:100%;max-width:360px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+h1{color:#66bb6a;font-size:1.5rem;margin-bottom:4px}
+.sub{color:#b2dfdb;font-size:.85rem;margin-bottom:16px}
+input{width:100%;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #444;background:#1e1e1e;color:#fff}
+input:focus{outline:2px solid #4CAF50}
+button{width:100%;padding:12px;margin-top:10px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:1rem;cursor:pointer;font-weight:bold}
+button:hover{background:#43a047}
+button:disabled{opacity:.5;cursor:wait}
+.err{color:#ef5350;font-size:.85rem;min-height:1.3em;margin-top:6px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs div{flex:1;padding:8px;border-radius:8px;background:#1a1a1a;cursor:pointer;font-size:.85rem;color:#999}
+.tabs div.on{background:#2e7d32;color:#fff;font-weight:bold}
+.demo{margin-top:12px;font-size:.7rem;color:#777;border-top:1px solid #333;padding-top:10px}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>🛡️ درع الغابة</h1>
+  <div class="sub">غرفة العمليات — دخول الموظفين المعتمدين</div>
+  <div class="tabs"><div id="tabLogin" class="on">دخول</div><div id="tabReg">حساب جديد</div></div>
+  <input type="email" id="email" placeholder="البريد الإلكتروني" dir="ltr" style="text-align:left">
+  <input type="password" id="pwd" placeholder="كلمة المرور (6+ أحرف)">
+  <button id="btnGo" onclick="go()">دخول</button>
+  <div class="err" id="err"></div>
+  <div class="demo">الوضع التجريبي: demo@forest.gov.sy / demo123<br>فعّل Email/Password في Firebase Authentication</div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script>
+var DEMO_MODE = false; // ✅ الإنتاج: المصادقة تعمل عبر Firebase
+var isReg = false;
+var firebaseConfig = {
+  apiKey: "AIzaSyBIiA-JYDCM8Wum1FymaTjrQYvafg61iTo",
+  authDomain: "forest-shield-syria.firebaseapp.com",
+  projectId: "forest-shield-syria",
+  storageBucket: "forest-shield-syria.firebasestorage.app",
+  messagingSenderId: "882990548445",
+  appId: "1:882990548445:web:9336952581fd285d82a234",
+  measurementId: "G-1J0SHZCSYL"
+};
+var auth = null;
+try {
+  if (typeof firebase !== 'undefined') {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+  }
+} catch(e) { auth = null; }
+
+// إن كانت هناك جلسة صالحة مسبقاً، انتقل مباشرة للعمليات
+try {
+  if (localStorage.getItem('fs_session') === 'ops' && localStorage.getItem('fs_auth') === '1') {
+    if (auth) {
+      auth.onAuthStateChanged(function(u){ if (u) location.replace('ops.html'); });
+    } else {
+      location.replace('ops.html');
+    }
+  }
+} catch(e) {}
+
+document.getElementById('tabLogin').onclick = function(){ isReg=false; this.classList.add('on'); document.getElementById('tabReg').classList.remove('on'); document.getElementById('btnGo').textContent='دخول'; };
+document.getElementById('tabReg').onclick = function(){ isReg=true; this.classList.add('on'); document.getElementById('tabLogin').classList.remove('on'); document.getElementById('btnGo').textContent='إنشاء الحساب'; };
+document.getElementById('pwd').addEventListener('keydown', function(e){ if(e.key==='Enter') go(); });
+
+function ok(user){
+  localStorage.setItem('fs_session','ops');
+  localStorage.setItem('fs_auth','1');
+  if (user) {
+    localStorage.setItem('fs_uid', user.uid);
+    if (user.email) localStorage.setItem('fs_email', user.email);
+  } else {
+    localStorage.setItem('fs_email', 'demo@forest.gov.sy');
+  }
+  location.replace('ops.html');
+}
+
+function go(){
+  var email = document.getElementById('email').value.trim();
+  var pwd = document.getElementById('pwd').value;
+  var err = document.getElementById('err');
+  err.textContent = '';
+  if (!email || !pwd) { err.textContent = 'أدخل البريد وكلمة المرور'; return; }
+
+  // ✅ الوضع التجريبي (احتياطي عند تعطيل Firebase)
+  if (DEMO_MODE && email === 'demo@forest.gov.sy' && pwd === 'demo123') {
+    ok(null); return;
+  }
+
+  if (!auth) {
+    err.textContent = 'تعذر الاتصال بخادم المصادقة';
+    return;
+  }
+
+  var btn = document.getElementById('btnGo'); btn.disabled = true;
+  var p = isReg ? auth.createUserWithEmailAndPassword(email, pwd) : auth.signInWithEmailAndPassword(email, pwd);
+  p.then(function(cred){ ok(cred.user); })
+   .catch(function(e){
+     btn.disabled = false;
+     // ✅ fallback تجريبي عند فشل Firebase للحساب التجريبي
+     if (DEMO_MODE && email === 'demo@forest.gov.sy' && pwd === 'demo123') {
+       ok(null); return;
+     }
+     var msgs = {
+       'auth/invalid-credential':'بيانات الدخول غير صحيحة',
+       'auth/email-already-in-use':'البريد مسجل مسبقاً',
+       'auth/weak-password':'كلمة المرور ضعيفة (6+ أحرف)',
+       'auth/invalid-email':'بريد غير صالح',
+       'auth/network-request-failed':'تحقق من الاتصال بالإنترنت',
+       'auth/operation-not-allowed':'فعّل Email/Password من Firebase Console',
+       'auth/user-not-found':'المستخدم غير موجود',
+       'auth/wrong-password':'كلمة المرور غير صحيحة',
+       'auth/too-many-requests':'محاولات كثيرة، حاول لاحقاً'
+     };
+     err.textContent = msgs[e.code] || e.message;
+   });
+}
+</script>
+</body>
+</html>
